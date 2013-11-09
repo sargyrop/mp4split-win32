@@ -6,9 +6,10 @@ The original source was downloaded from:
 
 http://h264.code-shop.com/download/mp4split-2.2.0.tar.gz
 
-The port is a quick and dirty port. I just added the missing headers, or replaced Unix headers with some el-cheapo replacements I found.
-Code should compile without warnings and errors.
+The port is a quick and dirty port. I just added the missing headers, or replaced Unix headers with some el-cheapo replacements I found. Code should compile without warnings and errors.
+
+I first commited the original, unchanged, non-ported code before commiting the ported code, this way one can easily spot the changes I've made.
 
 Original licensing applies.
 
-I've added a binary version of Mp4Split for Windows for the lazy people.
+I've added a binary version of Mp4Split for Windows for the lazy people, which can be downloaded here:
