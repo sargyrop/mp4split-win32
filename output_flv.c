@@ -92,7 +92,7 @@ extern int output_flv(struct mp4_context_t const* mp4_context,
         (trak_time_to_moov_time(cto, 1000, trak->mdia_->mdhd_->timescale_));
 
       MP4_INFO(
-        "frame=%u pts=%u offset=%"PRIu64" size=%u\n",
+        "frame=%u pts=%u offset=%llu size=%u\n",
         s, composition_time, sample_pos, sample_size);
 
       if(trak->mdia_->hdlr_->handler_type_ == FOURCC('v', 'i', 'd', 'e'))

@@ -42,7 +42,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <memory.h>
-#include <getopt.h>
+#include "pgetopt.c"
 
 #ifdef WIN32
 #define stat _stat64
@@ -123,18 +123,19 @@ int main(int argc, char *argv[])
 
   int c;
   bool show_usage = false;
-  while(((c = getopt(argc, argv, "i:o:v:")) != EOF) && !show_usage)
+  char *opt = "i:o:v:";
+  while(((c = pgetopt(argc, argv, opt)) != EOF) && !show_usage)
   {
     switch (c)
     {
       case 'i':
-        input_file = optarg;
+        input_file = poptarg;
         break;
       case 'o':
-        output_file = optarg;
+        output_file = poptarg;
         break;
       case 'v':
-        verbose = atoi(optarg);
+        verbose = atoi(poptarg);
         break;
       default:
         show_usage = true;
@@ -252,7 +253,7 @@ int main(int argc, char *argv[])
     outfile = fopen(output_file, "wb");
     if(!outfile)
     {
-      perror(optarg);
+      perror(poptarg);
       result = 0;
     }
 
@@ -386,7 +387,7 @@ int main(int argc, char *argv[])
           } while(bucket != buckets && result);
 
           struct bucket_t* bucket = buckets;
-          printf("writing %u buckets for a total of %"PRIu64" KBytes:\n", bucket_count, filesize >> 10);
+          printf("writing %u buckets for a total of %llu KBytes:\n", bucket_count, filesize >> 10);
           uint64_t filepos = 0;
           do
           {
@@ -401,7 +402,7 @@ int main(int argc, char *argv[])
               break;
             case BUCKET_TYPE_FILE:
 //              printf("file (%"PRIu64"), ", bucket->size_);
-              fseeko(infile, bucket->offset_, SEEK_SET);
+              _fseeki64(infile, bucket->offset_, SEEK_SET);
               result = copy_data(infile, outfile, bucket->size_);
               break;
             }

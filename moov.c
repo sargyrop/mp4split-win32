@@ -55,7 +55,7 @@
 #endif
 
 #ifndef WIN32
-#include <dirent.h>
+#include "dirent.h"
 #define DIR_SEPARATOR '/'
 #endif
 
@@ -563,11 +563,13 @@ extern int mp4_split(struct mp4_context_t* mp4_context,
                      struct mp4_split_options_t* options)
 {
   int result;
+  float start_time;
+  float end_time;
 
   moov_build_index(mp4_context, mp4_context->moov);
 
-  float start_time = options->start;
-  float end_time = options->end;
+  start_time = options->start;
+  end_time = options->end;
 
   // write fragment instead of complete moov atom (for Silverlight only)
   if(options->fragments)

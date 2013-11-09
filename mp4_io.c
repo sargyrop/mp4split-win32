@@ -38,7 +38,7 @@ extern uint64_t atoi64(const char* val)
 #ifdef WIN32
   return _atoi64(val);
 #else // elif defined(HAVE_STRTOLL)
-  return strtoll(val, NULL, 10);
+  return _strtoi64(val, NULL, 10);
 #endif
 }
 
@@ -176,7 +176,7 @@ extern int mp4_atom_read_header(mp4_context_t const* mp4_context,
 {
   unsigned char atom_header[8];
 
-  atom->start_ = ftello(infile);
+  atom->start_ = _ftelli64(infile);
   if(fread(atom_header, 8, 1, infile) != 1)
   {
     MP4_ERROR("%s", "Error reading atom header\n");
@@ -201,7 +201,7 @@ extern int mp4_atom_read_header(mp4_context_t const* mp4_context,
 
   atom->end_ = atom->start_ + atom->size_;
 
-  MP4_INFO("Atom(%c%c%c%c,%"PRIu64")\n",
+  MP4_INFO("Atom(%c%c%c%c,%llu)\n",
            atom->type_ >> 24, atom->type_ >> 16,
            atom->type_ >> 8, atom->type_,
            atom->size_);
@@ -243,7 +243,7 @@ static unsigned char* read_box(struct mp4_context_t* mp4_context,
                                FILE* infile, struct mp4_atom_t* atom)
 {
   unsigned char* box_data = (unsigned char*)malloc((size_t)atom->size_);
-  fseeko(infile, atom->start_, SEEK_SET);
+  _fseeki64(infile, atom->start_, SEEK_SET);
   if(fread(box_data, (off_t)atom->size_, 1, infile) != 1)
   {
     MP4_ERROR("Error reading %c%c%c%c atom\n",
@@ -260,7 +260,7 @@ static mp4_context_t* mp4_context_init(const char* filename, int verbose)
 {
   mp4_context_t* mp4_context = (mp4_context_t*)malloc(sizeof(mp4_context_t));
 
-  mp4_context->filename_ = strdup(filename);
+  mp4_context->filename_ = _strdup(filename);
   mp4_context->infile = NULL;
   mp4_context->verbose_ = verbose;
 
@@ -325,7 +325,7 @@ extern mp4_context_t* mp4_open(const char* filename, int64_t filesize, int mfra_
   if(mfra_only)
   {
     unsigned char mfro[16];
-    fseeko(mp4_context->infile, -16, SEEK_END);
+    _fseeki64(mp4_context->infile, -16, SEEK_END);
     if(fread(mfro, 16, 1, mp4_context->infile) != 1)
     {
       MP4_ERROR("%s", "Error reading mfro header\n");
@@ -334,7 +334,7 @@ extern mp4_context_t* mp4_open(const char* filename, int64_t filesize, int mfra_
     if(read_32(mfro + 4) == FOURCC('m', 'f', 'r', 'o'))
     {
       off_t mfra_size = read_32(mfro + 12);
-      fseeko(mp4_context->infile, -mfra_size, SEEK_END);
+      _fseeki64(mp4_context->infile, -mfra_size, SEEK_END);
 
       if(!mp4_atom_read_header(mp4_context, mp4_context->infile,
                                &mp4_context->mfra_atom))
@@ -349,10 +349,10 @@ extern mp4_context_t* mp4_open(const char* filename, int64_t filesize, int mfra_
         return 0;
       }
     }
-    fseeko(mp4_context->infile, 0, SEEK_SET);
+    _fseeki64(mp4_context->infile, 0, SEEK_SET);
   }
 
-  while(ftello(mp4_context->infile) < filesize)
+  while(_ftelli64(mp4_context->infile) < filesize)
   {
     struct mp4_atom_t leaf_atom;
 
@@ -394,7 +394,7 @@ extern mp4_context_t* mp4_open(const char* filename, int64_t filesize, int mfra_
       return 0;
     }
 
-    fseeko(mp4_context->infile, leaf_atom.end_, SEEK_SET);
+    _fseeki64(mp4_context->infile, leaf_atom.end_, SEEK_SET);
 
     // short-circuit for mfra. We only need the moov atom (hopefully at
     // the beginning of the file) and the mfra atom (hopefully at the offset
@@ -651,7 +651,7 @@ extern hdlr_t* hdlr_copy(hdlr_t const* rhs)
   atom->reserved1_ = rhs->reserved1_;
   atom->reserved2_ = rhs->reserved2_;
   atom->reserved3_ = rhs->reserved3_;
-  atom->name_ = rhs->name_ == NULL ? NULL : strdup(rhs->name_);
+  atom->name_ = rhs->name_ == NULL ? NULL : _strdup(rhs->name_);
 
   return atom;
 }
@@ -824,8 +824,8 @@ extern void dref_table_init(dref_table_t* entry)
 extern void dref_table_assign(dref_table_t* lhs, dref_table_t const* rhs)
 {
   lhs->flags_ = rhs->flags_;
-  lhs->name_ = rhs->name_ == NULL ? NULL : strdup(rhs->name_);
-  lhs->location_ = rhs->location_ == NULL ? NULL : strdup(rhs->location_);
+  lhs->name_ = rhs->name_ == NULL ? NULL : _strdup(rhs->name_);
+  lhs->location_ = rhs->location_ == NULL ? NULL : _strdup(rhs->location_);
 }
 
 extern void dref_table_exit(dref_table_t* entry)

@@ -26,7 +26,35 @@
 
 #ifdef WIN32
 #else
-#include <byteswap.h>
+/* Swap bytes in 16 bit value.  */
+#ifdef __GNUC__
+# define bswap_16(x) \
+	(__extension__                    \
+	({ unsigned short int __bsx = (x);               \
+	((((__bsx) >> 8) & 0xff) | (((__bsx) & 0xff) << 8)); }))
+#else
+static __inline unsigned short int
+	bswap_16 (unsigned short int __bsx)
+{
+	return ((((__bsx) >> 8) & 0xff) | (((__bsx) & 0xff) << 8));
+}
+#endif
+
+/* Swap bytes in 32 bit value.  */
+#ifdef __GNUC__
+# define bswap_32(x) \
+	(__extension__                    \
+	({ unsigned int __bsx = (x);               \
+	((((__bsx) & 0xff000000) >> 24) | (((__bsx) & 0x00ff0000) >>  8) |    \
+	(((__bsx) & 0x0000ff00) <<  8) | (((__bsx) & 0x000000ff) << 24)); }))
+#else
+static __inline unsigned int
+	bswap_32 (unsigned int __bsx)
+{
+	return ((((__bsx) & 0xff000000) >> 24) | (((__bsx) & 0x00ff0000) >>  8) |
+		(((__bsx) & 0x0000ff00) <<  8) | (((__bsx) & 0x000000ff) << 24));
+}
+#endif
 #endif
 
 static const uint32_t aac_samplerates[] =
@@ -394,13 +422,13 @@ static int mfra_get_track_fragment(struct mfra_t const* mfra,
           moof_offset = table[i].moof_offset_;
 
           // find the size of the MOOF and following MDAT atom
-          fseeko(mp4_context->infile, moof_offset, SEEK_SET);
+          _fseeki64(mp4_context->infile, moof_offset, SEEK_SET);
           if(!mp4_atom_read_header(mp4_context, mp4_context->infile, &fragment_moof_atom))
           {
             MP4_ERROR("%s", "Error reading MOOF atom\n");
             return 0;
           }
-          fseeko(mp4_context->infile, fragment_moof_atom.end_, SEEK_SET);
+          _fseeki64(mp4_context->infile, fragment_moof_atom.end_, SEEK_SET);
           if(!mp4_atom_read_header(mp4_context, mp4_context->infile, &fragment_mdat_atom))
           {
             MP4_ERROR("%s", "Error reading MDAT atom\n");
@@ -843,7 +871,7 @@ static int moof_create(struct mp4_context_t const* mp4_context,
         traf->trun_->table_[trun_index].sample_composition_time_offset_ = cto;
 
         MP4_INFO(
-          "frame=%u pts=%"PRIi64" cto=%u duration=%u offset=%"PRIu64" size=%u\n",
+          "frame=%u pts=%lld cto=%u duration=%u offset=%llu size=%u\n",
           s,
           trak->samples_[s].pts_,
           trak->samples_[s].cto_,
@@ -901,7 +929,7 @@ static int moof_create(struct mp4_context_t const* mp4_context,
               unsigned int nal_size;
               bucket_insert_tail(buckets, bucket_init_memory(nal_marker, 4));
 
-              if(fseeko(mp4_context->infile, first, SEEK_SET) != 0)
+              if(_fseeki64(mp4_context->infile, first, SEEK_SET) != 0)
               {
                 MP4_ERROR("%s", "Reached end of file prematurely\n");
                 return 0;
@@ -1331,7 +1359,7 @@ stream_write(struct stream_t const* that, char* buffer)
     {
       p += sprintf(p, "<c"
                       " n=\"%u\""
-                      " d=\"%"PRIu64"\""
+                      " d=\"%llu\""
                       " />\n",
                    chunk, *first);
       ++chunk;
@@ -1361,7 +1389,7 @@ smooth_streaming_media_write(struct smooth_streaming_media_t* that,
     p += sprintf(p, "<SmoothStreamingMedia"
                     " MajorVersion=\"1\""
                     " MinorVersion=\"0\""
-                    " Duration=\"%"PRIu64"\""
+                    " Duration=\"%llu\""
                     ">\n",
                  that->duration_);
   }
@@ -1383,6 +1411,7 @@ create_manifest(struct mp4_context_t const* mp4_context,
 {
   struct smooth_streaming_media_t* smooth_streaming_media = NULL;
   unsigned int track;
+  uint64_t first_pts; 
 
   if(!moov_build_index(mp4_context, moov))
   {
@@ -1613,7 +1642,7 @@ create_manifest(struct mp4_context_t const* mp4_context,
           }
 
           // SmoothStreaming uses a fixed 10000000 timescale
-          uint64_t first_pts = trak_time_to_moov_time(first->pts_,
+		  first_pts = trak_time_to_moov_time(first->pts_,
             10000000, trak->mdia_->mdhd_->timescale_);
 
           if(begin_pts != (uint64_t)(-1))
@@ -1746,6 +1775,11 @@ extern int mp4_fragment_file(struct mp4_context_t const* mp4_context,
                              struct mp4_split_options_t const* options)
 {
   struct moof_t* moof;
+  unsigned char* mfra_data;
+  unsigned int tfra_entries = 0;
+  unsigned int tfra_index = 0;
+  struct mfra_t* mfra;
+  uint32_t mfra_size;
   uint64_t filepos = 0;
   int result = 1;
 
@@ -1770,11 +1804,11 @@ extern int mp4_fragment_file(struct mp4_context_t const* mp4_context,
   // A fragmented MPEG4 file starts with a MOOV atom with only the mandatory
   // atoms
   {
+	      unsigned int i;
     struct moov_t* fmoov = moov_init();
     fmoov->mvhd_ = mvhd_copy(moov->mvhd_);
     fmoov->tracks_ = moov->tracks_;
 
-    unsigned int i;
     for(i = 0; i != moov->tracks_; ++i)
     {
       unsigned int s;
@@ -1817,113 +1851,118 @@ extern int mp4_fragment_file(struct mp4_context_t const* mp4_context,
       }
     }
 
-    unsigned char* moov_data = mp4_context->moov_data;
-    moov_write(fmoov, moov_data);
-    uint32_t moov_size = read_32(moov_data);
-    bucket_insert_tail(buckets, bucket_init_memory(moov_data, moov_size));
-    filepos += moov_size;
-    moov_exit(fmoov);
+	{
+		unsigned char* moov_data;
+		uint32_t moov_size;
+		moov_data = mp4_context->moov_data;
+		moov_write(fmoov, moov_data);
+		moov_size = read_32(moov_data);
+		bucket_insert_tail(buckets, bucket_init_memory(moov_data, moov_size));
+		filepos += moov_size;
+		moov_exit(fmoov);
+	}
   }
 
-  struct mfra_t* mfra = mfra_init();
-  mfra->tracks_ = moov->tracks_;
-
-  unsigned int i;
-  unsigned int tfra_entries = 0;
-  for(i = 0; i != moov->tracks_; ++i)
   {
-    struct trak_t const* trak = moov->traks_[i];
+	  unsigned int i;
 
-    struct tfra_t* tfra = tfra_init();
-    mfra->tfras_[i] = tfra;
-    tfra->version_ = 1;
-    tfra->flags_ = 0;
-    tfra->track_id_ = trak->tkhd_->track_id_;
-    tfra->length_size_of_traf_num_ = 1;
-    tfra->length_size_of_trun_num_ = 1;
-    tfra->length_size_of_sample_num_ = 1;
+	  mfra = mfra_init();
+	  mfra->tracks_ = moov->tracks_;
+	  for(i = 0; i != moov->tracks_; ++i)
+	  {
+		  unsigned int start;
+		  struct trak_t const* trak = moov->traks_[i];
 
-    // count the number of smooth sync samples (nr of moofs)
-    tfra->number_of_entry_ = 0;
-    unsigned int start;
-    for(start = 0; start != trak->samples_size_; ++start)
-    {
-      {
-        if(trak->samples_[start].is_smooth_ss_)
-        {
-          ++tfra->number_of_entry_;
-        }
-      }
-    }
-    tfra->table_ = (struct tfra_table_t*)
-      malloc(tfra->number_of_entry_ * sizeof(struct tfra_table_t));
+		  struct tfra_t* tfra = tfra_init();
+		  mfra->tfras_[i] = tfra;
+		  tfra->version_ = 1;
+		  tfra->flags_ = 0;
+		  tfra->track_id_ = trak->tkhd_->track_id_;
+		  tfra->length_size_of_traf_num_ = 1;
+		  tfra->length_size_of_trun_num_ = 1;
+		  tfra->length_size_of_sample_num_ = 1;
 
-    tfra_entries += tfra->number_of_entry_;
+		  // count the number of smooth sync samples (nr of moofs)
+		  tfra->number_of_entry_ = 0;
+		  for(start = 0; start != trak->samples_size_; ++start)
+		  {
+			  {
+				  if(trak->samples_[start].is_smooth_ss_)
+				  {
+					  ++tfra->number_of_entry_;
+				  }
+			  }
+		  }
+		  tfra->table_ = (struct tfra_table_t*)
+			  malloc(tfra->number_of_entry_ * sizeof(struct tfra_table_t));
 
-    start = 0;
-    unsigned int tfra_index = 0;
-    while(start != trak->samples_size_)
-    {
-      unsigned int end = start;
-      while(++end != trak->samples_size_)
-      {
-        if(trak->samples_[end].is_smooth_ss_)
-          break;
-      }
+		  tfra_entries += tfra->number_of_entry_;
 
-      struct bucket_t* bucket = bucket_init(BUCKET_TYPE_MEMORY);
-      bucket_insert_tail(buckets, bucket);
+		  start = 0;
+		  while(start != trak->samples_size_)
+		  {
+			  struct bucket_t* bucket;
+			  struct tfra_table_t* table;
+			  unsigned int end = start;
+			  
+			  while(++end != trak->samples_size_)
+			  {
+				  if(trak->samples_[end].is_smooth_ss_)
+					  break;
+			  }
+			 
+			  bucket= bucket_init(BUCKET_TYPE_MEMORY);
+			  bucket_insert_tail(buckets, bucket);
 
-      moof = moof_init();
+			  moof = moof_init();
 
-      moof_create(mp4_context, moof, trak, start, end, buckets, options);
+			  moof_create(mp4_context, moof, trak, start, end, buckets, options);
 
-      if(options->output_format == OUTPUT_FORMAT_MP4)
-      {
-        unsigned char moof_data[8192];
-        unsigned int moof_size;
-        moof_write(moof, moof_data);
-        moof_size = read_32(moof_data);
+			  if(options->output_format == OUTPUT_FORMAT_MP4)
+			  {
+				  unsigned char moof_data[8192];
+				  unsigned int moof_size;
+				  moof_write(moof, moof_data);
+				  moof_size = read_32(moof_data);
 
-        bucket->buf_ = malloc(moof_size);
-        bucket->size_ = moof_size;
-        memcpy(bucket->buf_, moof_data, (size_t)bucket->size_);
-//        bucket_insert_head(buckets, bucket_init_memory(moof_data, moof_size));
-      }
+				  bucket->buf_ = malloc(moof_size);
+				  bucket->size_ = moof_size;
+				  memcpy(bucket->buf_, moof_data, (size_t)bucket->size_);
+				  //        bucket_insert_head(buckets, bucket_init_memory(moof_data, moof_size));
+			  }
 
-      moof_exit(moof);
+			  moof_exit(moof);
 
-      struct tfra_table_t* table = &tfra->table_[tfra_index];
-      // SmoothStreaming uses a fixed 10000000 timescale
-      table->time_ = trak_time_to_moov_time(
-        trak->samples_[start].pts_, 10000000, trak->mdia_->mdhd_->timescale_);
-      table->moof_offset_ = filepos;
-      table->traf_number_ = 0;
-      table->trun_number_ = 0;
-      table->sample_number_ = 0;
+			  table = &tfra->table_[tfra_index];
+			  // SmoothStreaming uses a fixed 10000000 timescale
+			  table->time_ = trak_time_to_moov_time(
+				  trak->samples_[start].pts_, 10000000, trak->mdia_->mdhd_->timescale_);
+			  table->moof_offset_ = filepos;
+			  table->traf_number_ = 0;
+			  table->trun_number_ = 0;
+			  table->sample_number_ = 0;
 
-      // advance filepos for moof and mdat atom
-      while(*buckets != bucket)
-      {
-        filepos += bucket->size_;
-        bucket = bucket->next_;
-      }
+			  // advance filepos for moof and mdat atom
+			  while(*buckets != bucket)
+			  {
+				  filepos += bucket->size_;
+				  bucket = bucket->next_;
+			  }
 
-      // next fragment
-      ++tfra_index;
-      start = end;
-    }
-    // next track
+			  // next fragment
+			  ++tfra_index;
+			  start = end;
+		  }
+		  // next track
+	  }
   }
-
-  // Write the Movie Fragment Random Access (MFRA) atom
-  {
-    unsigned char* mfra_data = (unsigned char*)malloc(8192 + tfra_entries * 28);
-    uint32_t mfra_size = mfra_write(mfra, mfra_data);
+  
+	mfra_data = (unsigned char*)malloc(8192 + tfra_entries * 28);
+    mfra_size = mfra_write(mfra, mfra_data);
     bucket_insert_tail(buckets, bucket_init_memory(mfra_data, mfra_size));
     mfra_exit(mfra);
     free(mfra_data);
-  }
+  
 
   return result;
 }

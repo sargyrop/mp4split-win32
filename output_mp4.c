@@ -443,7 +443,7 @@ extern int output_mp4(struct mp4_context_t* mp4_context,
 
     if(mp4_context->ftyp_atom.size_)
     {
-      fseeko(mp4_context->infile, mp4_context->ftyp_atom.start_, SEEK_SET);
+      _fseeki64(mp4_context->infile, mp4_context->ftyp_atom.start_, SEEK_SET);
       if(fread(buffer, (off_t)mp4_context->ftyp_atom.size_, 1, mp4_context->infile) != 1)
       {
         MP4_ERROR("%s", "Error reading ftyp atom\n");
@@ -494,15 +494,15 @@ extern int output_mp4(struct mp4_context_t* mp4_context,
         trak->samples_[start_sample].pos_ - trak->samples_[0].pos_;
       if(skip < skip_from_start)
         skip_from_start = skip;
-      MP4_INFO("Trak can skip %"PRIu64" bytes\n", skip);
+      MP4_INFO("Trak can skip %llu bytes\n", skip);
 
       if(end_sample != trak->samples_size_)
       {
         uint64_t end_pos = trak->samples_[end_sample].pos_;
         if(end_pos > end_offset)
           end_offset = end_pos;
-        MP4_INFO("New endpos=%"PRIu64"\n", end_pos);
-        MP4_INFO("Trak can skip %"PRIu64" bytes at end\n",
+        MP4_INFO("New endpos=%llu\n", end_pos);
+        MP4_INFO("Trak can skip %llu bytes at end\n",
                mdat_start + mdat_size - end_offset);
       }
     }
@@ -516,7 +516,7 @@ extern int output_mp4(struct mp4_context_t* mp4_context,
           moov_time_scale, trak_time_scale);
         trak->mdia_->mdhd_->duration_= trak_duration;
         trak->tkhd_->duration_ = duration;
-        MP4_INFO("trak: new_duration=%"PRIu64"\n", duration);
+        MP4_INFO("trak: new_duration=%llu\n", duration);
 
         if(duration > moov_duration)
           moov_duration = duration;
@@ -542,7 +542,7 @@ extern int output_mp4(struct mp4_context_t* mp4_context,
   // add new moov size
   offset += moov_size;
 
-  MP4_INFO("shifting offsets by %"PRId64"\n", offset);
+  MP4_INFO("shifting offsets by %llu\n", offset);
   moov_shift_offsets_inplace(moov, offset);
 
   // traffic shaping: create offsets for each second

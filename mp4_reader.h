@@ -15,7 +15,7 @@
 #ifndef _MSC_VER
 #include <inttypes.h>
 #else
-#include "inttypes.h"
+#include <stdint.h>
 #endif
 
 #ifdef __cplusplus

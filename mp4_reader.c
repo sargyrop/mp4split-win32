@@ -33,7 +33,7 @@ typedef struct atom_t atom_t;
 
 static void atom_print(mp4_context_t const* mp4_context, atom_t const* atom)
 {
-  MP4_INFO("Atom(%c%c%c%c,%"PRIu64")\n",
+  MP4_INFO("Atom(%c%c%c%c,%llu)\n",
            atom->type_ >> 24,
            atom->type_ >> 16,
            atom->type_ >> 8,
