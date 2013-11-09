@@ -8,6 +8,8 @@ http://h264.code-shop.com/download/mp4split-2.2.0.tar.gz
 
 The port is a quick and dirty port. I just added the missing headers, or replaced Unix headers with some el-cheapo replacements I found. Code should compile without warnings and errors.
 
+The code is C89 compatible and can be compiled with MSVC2010 (Microsoft Visual C++ 2010). Simple create an empty project, add the files and build :)
+
 I first commited the original, unchanged, non-ported code before commiting the ported code, this way one can easily spot the changes I've made.
 
 Original licensing applies.
