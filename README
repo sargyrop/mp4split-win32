@@ -13,3 +13,5 @@ I first commited the original, unchanged, non-ported code before commiting the p
 Original licensing applies.
 
 I've added a binary version of Mp4Split for Windows for the lazy people, which can be downloaded here:
+
+https://github.com/Photonios/mp4split-win32/raw/master/bin/Mp4Split.exe
