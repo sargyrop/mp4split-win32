@@ -1,0 +1,14 @@
+A port of CodeShop (BV) 's Mp4Split which is originally a Unix/Linux tool. The documentation can be found here:
+
+http://www.unified-streaming.com/support/documentation/content-packaging/
+
+The original source was downloaded from:
+
+http://h264.code-shop.com/download/mp4split-2.2.0.tar.gz
+
+The port is a quick and dirty port. I just added the missing headers, or replaced Unix headers with some el-cheapo replacements I found.
+Code should compile without warnings and errors.
+
+Original licensing applies.
+
+I've added a binary version of Mp4Split for Windows for the lazy people.
